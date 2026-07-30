@@ -56,6 +56,17 @@ claude mcp add agh-skos --scope project -- uv run --directory /path/to/agh-skos-
 
 Verify with `claude mcp list`, or `/mcp` inside a session.
 
+### Without uv
+
+`uv run` is only there to provide the one dependency (the `mcp` SDK) and keep it in sync with
+the lockfile. If you would rather manage the environment yourself, install the package and
+point Claude Code at the resulting executable:
+
+```bash
+python -m venv .venv && .venv/bin/pip install -e .   # .venv\Scripts\pip on Windows
+claude mcp add agh-skos --scope user -- /path/to/agh-skos-mcp/.venv/bin/agh-skos-mcp
+```
+
 ## Development
 
 ```bash

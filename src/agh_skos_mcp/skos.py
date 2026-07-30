@@ -102,7 +102,7 @@ def _page_props(url: str) -> tuple[dict[str, Any], str]:
         raise SkosError(f"__NEXT_DATA__ not found at {final_url}")
     props = json.loads(match.group(1))["props"]["pageProps"]
     if props.get("error"):
-        raise SkosError(str(props["error"]))
+        raise SkosError(f"SkOs returned error {props['error']} for {final_url}")
     return cast("dict[str, Any]", props), final_url
 
 
