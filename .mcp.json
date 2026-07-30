@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "agh-skos": {
+      "command": "uv",
+      "args": ["run", "agh-skos-mcp"]
+    }
+  }
+}
