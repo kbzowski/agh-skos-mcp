@@ -1,38 +1,23 @@
 # agh-skos-mcp
 
 MCP server for [SkOs](https://skos.agh.edu.pl) — the AGH University staff directory.
-Lets an agent find people by name, unit, position, room, phone or collegial body, and
-read their contact data.
+No API key, no login.
 
 ## Tools
 
-| Tool | What it does |
-|---|---|
-| `search_people` | Advanced search. Text filters (`nazwisko`, `imie`, `email`, `pokoj`, `telefon`) are case-insensitive prefix matches. Dictionary filters (`tytul`, `id_status`, `grupa`, `stanowisko`, `funkcja`, `jednostka`, `pawilon`, `cialo`) take a numeric id or a Polish label. When exactly one person matches, the full profile comes back in `person`. |
-| `get_person` | Full profile by slug or url: units, position, group, function, room, phones, e-mail, www, collegial bodies. |
-| `list_filter_options` | Allowed values of a dictionary filter, optionally narrowed by substring. |
+| Tool | Arguments | Returns |
+|---|---|---|
+| `search_people` | `nazwisko`, `imie`, `email`, `pokoj`, `telefon` (prefix, case-insensitive) · `tytul`, `id_status`, `grupa`, `stanowisko`, `funkcja`, `jednostka`, `pawilon`, `cialo` (id or Polish label) · `limit` | `total`, `results[]` (name, title, url, units), `person` — full profile, set only when exactly one person matched |
+| `get_person` | `person` — slug or url, e.g. `krzysztof-bzowski-7674` | id, name, title, emails, phones, www, workplaces (unit, job, group, function, room), collegial bodies |
+| `list_filter_options` | `field`, `contains` | `[{value, label}]` |
 
-No API key, no login — the server reads the same public pages the site serves to a browser.
+An ambiguous label raises an error listing the candidates. A query with no filters is rejected.
 
-## Requirements
+## Add to Claude Code
 
-[uv](https://docs.astral.sh/uv/). Nothing else; `uv` fetches Python and the dependencies.
+Requires [uv](https://docs.astral.sh/uv/).
 
-```bash
-No install step is needed to *use* the server — `uvx` builds and caches it on first run.
-Clone only if you intend to work on it:
-
-```bash
-git clone https://github.com/kbzowski/agh-skos-mcp
-cd agh-skos-mcp
-uv sync
-```
-
-## Adding to Claude Code
-
-### Option 1 — `.mcp.json` (shared with the project)
-
-Create `.mcp.json` in your project root:
+`.mcp.json` in the project root:
 
 ```json
 {
@@ -45,63 +30,38 @@ Create `.mcp.json` in your project root:
 }
 ```
 
-Claude Code picks it up on the next start and asks once whether to trust the server.
-Commit the file to share the server with your team — nobody else has to clone anything.
-
-### Option 2 — CLI
+Or via CLI:
 
 ```bash
-# just for you, in every project
 claude mcp add agh-skos --scope user -- uvx --from git+https://github.com/kbzowski/agh-skos-mcp agh-skos-mcp
-
-# or write the .mcp.json above for the whole project
-claude mcp add agh-skos --scope project -- uvx --from git+https://github.com/kbzowski/agh-skos-mcp agh-skos-mcp
 ```
 
-Verify with `claude mcp list`, or `/mcp` inside a session.
+Check with `claude mcp list` or `/mcp`.
 
-### Working on the server
+## Development
 
-`uvx` caches the build, so it will not pick up your edits. Point Claude Code at the working
-copy instead — `uv run` re-syncs the environment from the lockfile on every start:
+```bash
+git clone https://github.com/kbzowski/agh-skos-mcp && cd agh-skos-mcp
+uv sync
+
+uv run ruff check . && uv run ruff format .
+uv run mypy
+uv run pytest              # offline
+uv run pytest -m network   # against the live directory
+```
+
+`uvx` caches its build. To run your working copy:
 
 ```bash
 claude mcp add agh-skos --scope user -- uv run --directory /path/to/agh-skos-mcp agh-skos-mcp
 ```
 
-### Without uv
+## Implementation notes
 
-The only dependency is the `mcp` SDK. To manage the environment yourself, install the package
-and point Claude Code at the resulting executable:
-
-```bash
-python -m venv .venv && .venv/bin/pip install -e .   # .venv\Scripts\pip on Windows
-claude mcp add agh-skos --scope user -- /path/to/agh-skos-mcp/.venv/bin/agh-skos-mcp
-```
-
-## Development
-
-```bash
-uv run ruff check .          # lint
-uv run ruff format .         # format
-uv run mypy                  # strict type check
-uv run pytest                # unit tests, offline
-uv run pytest -m network     # contract tests against the live directory
-```
-
-`ruff`, `mypy` and the offline tests also run on every push (see `.github/workflows/ci.yml`).
-
-## How it works
-
-SkOs is a Next.js front-end. The advanced search form is a plain `GET /search/`, and each
-rendered page embeds its data as JSON in `__NEXT_DATA__` — that is what this server parses,
-so there is no HTML scraping. Filter dictionaries come from the site's own `/a/select?id=…`
-endpoint. E-mail addresses are stored obfuscated (a reversed `<a>` tag with `#` for `@`) and
-are decoded on the way out.
-
-One quirk worth knowing: when a query matches exactly one person, SkOs redirects from
-`/search/` straight to the profile page. `search_people` detects that and returns the full
-record instead of an empty result list.
+- Data comes from the `__NEXT_DATA__` JSON embedded in each rendered page, not from HTML scraping.
+- Filter dictionaries come from the site's `/a/select?id=…` endpoint.
+- E-mails are stored obfuscated (reversed `<a>` tag, `#` for `@`) and decoded on the way out.
+- A search matching exactly one person redirects `/search/` → profile page; `search_people` follows it and returns the full record in `person`.
 
 ## License
 
