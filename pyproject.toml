@@ -1,0 +1,70 @@
+[project]
+name = "agh-skos-mcp"
+version = "0.1.0"
+description = "MCP server for the AGH staff directory (skos.agh.edu.pl)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Krzysztof Bzowski", email = "bzowski.k@gmail.com" }]
+keywords = ["mcp", "agh", "skos", "directory"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Typing :: Typed",
+]
+dependencies = ["mcp>=2.0"]
+
+[project.scripts]
+agh-skos-mcp = "agh_skos_mcp.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/kbzowski/agh-skos-mcp"
+Issues = "https://github.com/kbzowski/agh-skos-mcp/issues"
+
+[dependency-groups]
+dev = ["mypy>=1.13", "pytest>=8.3", "ruff>=0.8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "A",    # builtin shadowing
+    "ANN",  # missing annotations
+    "B",    # bugbear
+    "C4",   # comprehensions
+    "E",    # pycodestyle
+    "F",    # pyflakes
+    "I",    # import order
+    "N",    # naming
+    "PTH",  # use pathlib
+    "RUF",
+    "S",    # bandit
+    "SIM",
+    "TID",
+    "UP",   # pyupgrade
+    "W",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ANN", "S101"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["src", "tests"]
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+addopts = "-q --strict-markers -m 'not network'"
+markers = ["network: hits the live skos.agh.edu.pl service"]
+testpaths = ["tests"]
