@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import html
 import json
 import re
+import urllib.error
 import urllib.parse
 import urllib.request
 from functools import lru_cache
@@ -89,9 +91,15 @@ class SearchResults(TypedDict):
 
 def _fetch(url: str) -> tuple[str, str]:
     """Return the response body and the final URL after any redirects."""
+    if not url.startswith(f"{BASE}/"):
+        raise ValueError(f"Refusing to fetch {url!r}: not a {BASE} address")
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})  # noqa: S310
-    with urllib.request.urlopen(request, timeout=TIMEOUT) as response:  # noqa: S310
-        return response.read().decode("utf-8"), response.geturl()
+    try:
+        with urllib.request.urlopen(request, timeout=TIMEOUT) as response:  # noqa: S310
+            charset = response.headers.get_content_charset("utf-8")
+            return response.read().decode(charset), response.geturl()
+    except (urllib.error.URLError, TimeoutError) as exc:
+        raise SkosError(f"Request to {url} failed: {exc}") from exc
 
 
 def _page_props(url: str) -> tuple[dict[str, Any], str]:
@@ -107,14 +115,24 @@ def _page_props(url: str) -> tuple[dict[str, Any], str]:
 
 
 def deobfuscate_email(blob: str) -> str:
-    """Undo the site's obfuscation: a reversed <a> tag with '#' for '@'."""
-    return _TAGS.sub("", blob[::-1]).replace("#", "@").strip()
+    """Undo the site's obfuscation: a reversed <a> tag with '#' for '@'.
+
+    Reversing an address the site stopped obfuscating would silently yield a
+    plausible but wrong one, so the marker is checked and the result verified.
+    """
+    text = _TAGS.sub("", blob[::-1] if "#" in blob else blob)
+    email = html.unescape(text).replace("#", "@").strip()
+    if "@" not in email:
+        raise SkosError(f"Cannot decode an e-mail address from {blob!r}")
+    return email
 
 
 def person_url(reference: str) -> str:
     """Normalise a profile slug, path or URL into an absolute profile URL."""
     reference = reference.strip()
-    if reference.startswith("http"):
+    if reference.startswith(("http://", "https://")):
+        if not reference.startswith(f"{BASE}/"):
+            raise ValueError(f"Refusing to fetch {reference!r}: not a {BASE} URL")
         return reference
     if not reference.startswith("/"):
         reference = f"/osoba/{reference}"
@@ -133,8 +151,8 @@ def options(field: DictField) -> list[Option]:
     result: list[Option] = []
     for item in items:
         title = item.get("title")
-        label = title if isinstance(title, str) else (title or {}).get("pl", "")
-        result.append({"value": str(item["id"]), "label": label.strip()})
+        label = title if isinstance(title, str) else (title or {}).get("pl")
+        result.append({"value": str(item.get("id", "")), "label": (label or "").strip()})
     return result
 
 
@@ -156,14 +174,16 @@ def resolve(field: DictField, value: str) -> str:
 
 def _polish_names(entries: list[dict[str, Any]] | None, key: str) -> list[str]:
     """Collect the Polish display names of nested dictionary entries, dropping blanks."""
-    names = ((entry.get(key) or {}).get("pl") for entry in entries or [])
+    names = ((entry.get(key) or {}).get("pl") for entry in entries or [] if entry)
     return [name for name in names if name]
 
 
 def _parse_workplace(raw: dict[str, Any]) -> Workplace:
     office = raw.get("office") or {}
     location = " ".join(
-        part for part in (office.get("building"), office.get("floor"), office.get("room")) if part
+        str(part)
+        for part in (office.get("building"), office.get("floor"), office.get("room"))
+        if part
     )
     return {
         "units": _polish_names(raw.get("unit"), "displayName"),
@@ -184,7 +204,7 @@ def parse_person(raw: dict[str, Any], url: str) -> Person:
     return {
         "id": raw.get("id"),
         "name": " ".join(part for part in names if part),
-        "title": (raw.get("title") or {}).get("displayName", {}).get("pl"),
+        "title": ((raw.get("title") or {}).get("displayName") or {}).get("pl"),
         "emails": [deobfuscate_email(email) for email in raw.get("emails") or []],
         "mobile_phones": raw.get("mobilePhone") or [],
         "www": raw.get("www") or [],
@@ -222,7 +242,10 @@ def search(*, limit: int = 50, **filters: str) -> SearchResults:
     props, final_url = _page_props(url)
     data = props.get("data") or {}
 
-    if "/osoba/" in final_url:
+    # A single match makes the site redirect to the profile instead of listing it.
+    # Match on the data shape too, so a change to that jump fails loudly rather
+    # than silently reporting "nobody found".
+    if final_url.startswith(f"{BASE}/osoba/") or data.get("lastname"):
         person = parse_person(data, final_url)
         hit: SearchHit = {
             "name": person["name"],
@@ -230,14 +253,13 @@ def search(*, limit: int = 50, **filters: str) -> SearchResults:
             "url": final_url,
             "status": [],
             "units": [
-                workplace["units"][-1] if workplace["units"] else ""
-                for workplace in person["workplaces"]
+                workplace["units"][-1] for workplace in person["workplaces"] if workplace["units"]
             ],
         }
         return {"total": 1, "returned": 1, "query": url, "results": [hit], "person": person}
 
     items: list[dict[str, Any]] = data.get("items") or []
-    results = [_parse_hit(item) for item in items[:limit]]
+    results = [_parse_hit(item) for item in items[: max(1, limit)]]
     return {
         "total": len(items),
         "returned": len(results),
@@ -249,9 +271,8 @@ def search(*, limit: int = 50, **filters: str) -> SearchResults:
 
 def get_person(reference: str) -> Person:
     """Fetch a full profile by slug, path or URL."""
-    url = person_url(reference)
-    props, _ = _page_props(url)
+    props, final_url = _page_props(person_url(reference))
     data = props.get("data")
     if not data:
         raise SkosError(f"No person data for {reference!r}")
-    return parse_person(data, url)
+    return parse_person(data, final_url)

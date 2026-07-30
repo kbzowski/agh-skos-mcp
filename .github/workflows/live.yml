@@ -1,0 +1,19 @@
+name: Live contract
+
+# The directory is scraped, not consumed through a stable API - these tests are
+# the only signal that skos.agh.edu.pl changed shape.
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run pytest -m network

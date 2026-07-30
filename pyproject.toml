@@ -12,7 +12,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Typing :: Typed",
 ]
-dependencies = ["mcp>=2.0"]
+dependencies = ["mcp>=2.0,<3"]
 
 [project.scripts]
 agh-skos-mcp = "agh_skos_mcp.__main__:main"
