@@ -19,6 +19,10 @@ No API key, no login — the server reads the same public pages the site serves 
 [uv](https://docs.astral.sh/uv/). Nothing else; `uv` fetches Python and the dependencies.
 
 ```bash
+No install step is needed to *use* the server — `uvx` builds and caches it on first run.
+Clone only if you intend to work on it:
+
+```bash
 git clone https://github.com/kbzowski/agh-skos-mcp
 cd agh-skos-mcp
 uv sync
@@ -34,33 +38,41 @@ Create `.mcp.json` in your project root:
 {
   "mcpServers": {
     "agh-skos": {
-      "command": "uv",
-      "args": ["run", "--directory", "/path/to/agh-skos-mcp", "agh-skos-mcp"]
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/kbzowski/agh-skos-mcp", "agh-skos-mcp"]
     }
   }
 }
 ```
 
 Claude Code picks it up on the next start and asks once whether to trust the server.
-Commit the file to share the server with your team.
+Commit the file to share the server with your team — nobody else has to clone anything.
 
 ### Option 2 — CLI
 
 ```bash
 # just for you, in every project
-claude mcp add agh-skos --scope user -- uv run --directory /path/to/agh-skos-mcp agh-skos-mcp
+claude mcp add agh-skos --scope user -- uvx --from git+https://github.com/kbzowski/agh-skos-mcp agh-skos-mcp
 
 # or write the .mcp.json above for the whole project
-claude mcp add agh-skos --scope project -- uv run --directory /path/to/agh-skos-mcp agh-skos-mcp
+claude mcp add agh-skos --scope project -- uvx --from git+https://github.com/kbzowski/agh-skos-mcp agh-skos-mcp
 ```
 
 Verify with `claude mcp list`, or `/mcp` inside a session.
 
+### Working on the server
+
+`uvx` caches the build, so it will not pick up your edits. Point Claude Code at the working
+copy instead — `uv run` re-syncs the environment from the lockfile on every start:
+
+```bash
+claude mcp add agh-skos --scope user -- uv run --directory /path/to/agh-skos-mcp agh-skos-mcp
+```
+
 ### Without uv
 
-`uv run` is only there to provide the one dependency (the `mcp` SDK) and keep it in sync with
-the lockfile. If you would rather manage the environment yourself, install the package and
-point Claude Code at the resulting executable:
+The only dependency is the `mcp` SDK. To manage the environment yourself, install the package
+and point Claude Code at the resulting executable:
 
 ```bash
 python -m venv .venv && .venv/bin/pip install -e .   # .venv\Scripts\pip on Windows
