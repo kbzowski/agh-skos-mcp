@@ -1,6 +1,6 @@
 [project]
 name = "agh-skos-mcp"
-version = "0.1.0"
+version = "0.1.1"
 description = "MCP server for the AGH staff directory (skos.agh.edu.pl)"
 readme = "README.md"
 requires-python = ">=3.11"

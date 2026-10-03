@@ -139,6 +139,7 @@ def test_parse_person_maps_the_public_fields() -> None:
         "title": {"displayName": {"pl": "dr inż."}},
         "emails": ['>a/<lp.ude.hga#ikswozbk>"lp.ude.hga#ikswozbk:otliam"=ferh a<'],
         "www": ["http://home.agh.edu.pl/kbzowski"],
+        "mobilePhone": [{"countryCode": "48", "phoneNumber": "603 670 638", "phoneType": "S"}],
         "workplaces": [
             {
                 "office": {"building": "B-5", "floor": "VI p.", "room": "pok. 605"},
@@ -155,7 +156,7 @@ def test_parse_person_maps_the_public_fields() -> None:
 
     assert person["name"] == "Krzysztof Bzowski"
     assert person["emails"] == ["kbzowski@agh.edu.pl"]
-    assert person["mobile_phones"] == []
+    assert person["mobile_phones"] == ["+48 603 670 638"]
     workplace = person["workplaces"][0]
     assert workplace["office"] == "B-5 VI p. pok. 605"
     assert workplace["phones"] == ["+48 12 617 26 15"]

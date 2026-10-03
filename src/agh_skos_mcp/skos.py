@@ -178,6 +178,13 @@ def _polish_names(entries: list[dict[str, Any]] | None, key: str) -> list[str]:
     return [name for name in names if name]
 
 
+def _phones(raw: list[dict[str, Any]] | None) -> list[str]:
+    return [
+        "+" + " ".join(filter(None, (phone.get("countryCode"), phone.get("phoneNumber"))))
+        for phone in raw or []
+    ]
+
+
 def _parse_workplace(raw: dict[str, Any]) -> Workplace:
     office = raw.get("office") or {}
     location = " ".join(
@@ -192,10 +199,7 @@ def _parse_workplace(raw: dict[str, Any]) -> Workplace:
         "function": (raw.get("function") or {}).get("pl") if raw.get("function") else None,
         "status": (raw.get("status") or {}).get("pl"),
         "office": location or None,
-        "phones": [
-            "+" + " ".join(filter(None, (phone.get("countryCode"), phone.get("phoneNumber"))))
-            for phone in raw.get("phoneDetails") or []
-        ],
+        "phones": _phones(raw.get("phoneDetails")),
     }
 
 
@@ -206,7 +210,7 @@ def parse_person(raw: dict[str, Any], url: str) -> Person:
         "name": " ".join(part for part in names if part),
         "title": ((raw.get("title") or {}).get("displayName") or {}).get("pl"),
         "emails": [deobfuscate_email(email) for email in raw.get("emails") or []],
-        "mobile_phones": raw.get("mobilePhone") or [],
+        "mobile_phones": _phones(raw.get("mobilePhone")),
         "www": raw.get("www") or [],
         "workplaces": [_parse_workplace(workplace) for workplace in raw.get("workplaces") or []],
         "collegial": _polish_names(raw.get("collegial"), "displayName"),
